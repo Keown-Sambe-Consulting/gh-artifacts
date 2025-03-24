@@ -22,18 +22,56 @@ jobs:
         run: npm ci
       - name: Ensure ESLint is installed
         run: npm install --save-dev eslint
-      - name: Ensure ESLint config file exists
+      - name: Check for ESLint config
         run: |
           if [ ! -f .eslintrc.js ] && [ ! -f .eslintrc.json ] && [ ! -f .eslintrc.yml ]; then
-            echo "No ESLint config file found. Creating a default one..."
-            echo '{
-              "env": { "browser": true, "es2021": true },
-              "extends": ["eslint:recommended"],
-              "parserOptions": { "ecmaVersion": "latest", "sourceType": "module" },
-              "rules": {}
-            }' > .eslintrc.json
+            echo "No ESLint configuration file found. Creating one..."
+            npx eslint --init
           fi
       - name: Lint code
         run: npm run lint
       - name: Test code
         run: npm run test
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    outputs:
+      script-file: ${{ steps.publish.outputs.script-file }}
+    steps:
+      - name: Get code
+        uses: actions/checkout@v4
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: deps-node-modules-${{ hashFiles('**/package-lock.json') }}
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.14.0
+      - name: Install dependencies
+        run: npm ci
+      - name: Build website
+        run: npm run build
+      - name: Publish JS filename
+        id: publish
+        run: find dist/assets/*.js -type f -execdir echo 'script-file={}' >> $GITHUB_OUTPUT ';'
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-files
+          path: dist
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist-files
+      - name: Output contents
+        run: ls
+      - name: Output filename
+        run: echo "${{ needs.build.outputs.script-file }}"
+      - name: Deploy
+        run: echo "Deploying..."
