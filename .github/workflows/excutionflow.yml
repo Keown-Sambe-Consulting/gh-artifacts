@@ -80,8 +80,8 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: dist-files
-          path: dist
+          name: json-artifact
+          path: package.json
 
   deploy:
     needs: build
